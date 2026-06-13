@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>いっくいっく 1Quick — 俳句作成アプリ</title>
+<style>
+  :root {
+    --washi: #f7f3e8;
+    --sumi: #2b2a28;
+    --shu: #c73e3a;
+    --matcha: #6a8d5f;
+    --kin: #b8923e;
+    --usuzumi: #8a857c;
+    --card: #fffdf7;
+    --line: #e2dccb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--washi);
+    color: var(--sumi);
+    font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px 16px 80px; }
+
+  header { text-align: center; padding: 18px 0 6px; }
+  h1 { font-size: 1.9rem; letter-spacing: 0.15em; }
+  h1 .quick { color: var(--shu); }
+  .tagline { color: var(--usuzumi); font-size: 0.85rem; margin-top: 4px; letter-spacing: 0.1em; }
+
+  /* ---- お題 ---- */
+  .odai-box {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; margin: 14px 0;
+  }
+  .odai-label { font-size: 0.75rem; color: var(--usuzumi); white-space: nowrap; }
+  .odai-text { flex: 1; font-size: 1.05rem; }
+  .gacha-btn {
+    border: 1px solid var(--shu); color: var(--shu); background: none;
+    border-radius: 999px; padding: 6px 14px; font-family: inherit; font-size: 0.85rem;
+    cursor: pointer; white-space: nowrap; transition: background 0.15s, color 0.15s;
+  }
+  .gacha-btn:hover { background: var(--shu); color: #fff; }
+
+  /* ---- 入力 3行 ---- */
+  .ku-area { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+  .ku-row {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px;
+  }
+  .ku-row.done { border-color: var(--matcha); box-shadow: 0 0 0 1px var(--matcha); }
+  .ku-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .ku-name { font-size: 0.75rem; color: var(--usuzumi); letter-spacing: 0.2em; }
+  .mora-badge { font-size: 0.85rem; font-weight: bold; }
+  .mora-badge.ok { color: var(--matcha); }
+  .mora-badge.near { color: var(--kin); }
+  .mora-badge.off { color: var(--usuzumi); }
+  .ku-input {
+    width: 100%; border: none; border-bottom: 2px solid var(--line);
+    background: transparent; font-family: inherit; font-size: 1.35rem;
+    padding: 4px 2px; outline: none; letter-spacing: 0.08em;
+  }
+  .ku-input:focus { border-bottom-color: var(--shu); }
+  .yomi-row { display: none; margin-top: 6px; align-items: center; gap: 6px; }
+  .yomi-row.show { display: flex; }
+  .yomi-row label { font-size: 0.7rem; color: var(--kin); white-space: nowrap; }
+  .yomi-input {
+    flex: 1; border: 1px dashed var(--kin); border-radius: 6px; background: transparent;
+    font-family: inherit; font-size: 0.9rem; padding: 3px 8px; outline: none;
+  }
+  .mora-dots { display: flex; gap: 4px; margin-top: 8px; }
+  .mora-dots span {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1px solid var(--line); background: transparent; transition: background 0.2s;
+  }
+  .mora-dots span.fill { background: var(--matcha); border-color: var(--matcha); }
+  .mora-dots span.over { background: var(--kin); border-color: var(--kin); }
+
+  /* ---- 完成ボタン ---- */
+  .finish-bar { text-align: center; margin: 18px 0; }
+  .finish-btn {
+    background: var(--shu); color: #fff; border: none; border-radius: 999px;
+    padding: 12px 36px; font-family: inherit; font-size: 1.05rem; letter-spacing: 0.2em;
+    cursor: pointer; opacity: 0.4; transition: opacity 0.2s, transform 0.15s;
+  }
+  .finish-btn.ready { opacity: 1; }
+  .finish-btn.ready:hover { transform: scale(1.05); }
+  .finish-note { font-size: 0.72rem; color: var(--usuzumi); margin-top: 6px; }
+
+  /* ---- サポートパネル ---- */
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    margin: 14px 0; overflow: hidden;
+  }
+  .panel-head {
+    width: 100%; text-align: left; background: none; border: none; font-family: inherit;
+    padding: 12px 14px; font-size: 0.95rem; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; color: var(--sumi);
+  }
+  .panel-head .arrow { color: var(--usuzumi); transition: transform 0.2s; }
+  .panel.open .panel-head .arrow { transform: rotate(90deg); }
+  .panel-body { display: none; padding: 0 14px 14px; }
+  .panel.open .panel-body { display: block; }
+
+  .season-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .season-tab {
+    border: 1px solid var(--line); background: none; border-radius: 999px;
+    padding: 4px 14px; font-family: inherit; font-size: 0.85rem; cursor: pointer; color: var(--sumi);
+  }
+  .season-tab.active { background: var(--sumi); color: var(--washi); border-color: var(--sumi); }
+  .kigo-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid var(--matcha); color: var(--matcha); background: none;
+    border-radius: 8px; padding: 5px 10px; font-family: inherit; font-size: 0.9rem; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .chip:hover { background: var(--matcha); color: #fff; }
+  .chip small { opacity: 0.75; font-size: 0.7em; margin-left: 3px; }
+  .kigo-note { font-size: 0.72rem; color: var(--usuzumi); margin-top: 10px; }
+
+  .tmpl-card {
+    width: 100%; text-align: left; background: var(--washi); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font-family: inherit; cursor: pointer; margin-bottom: 8px;
+  }
+  .tmpl-card:hover { border-color: var(--shu); }
+  .tmpl-title { font-size: 0.85rem; color: var(--shu); margin-bottom: 3px; }
+  .tmpl-ex { font-size: 0.95rem; letter-spacing: 0.05em; }
+  .tmpl-hint { font-size: 0.72rem; color: var(--usuzumi); margin-top: 3px; }
+
+  .tips-list { list-style: none; }
+  .tips-list li {
+    font-size: 0.88rem; line-height: 1.7; padding: 6px 0 6px 1.4em; position: relative;
+    border-bottom: 1px dotted var(--line);
+  }
+  .tips-list li::before { content: "✿"; position: absolute; left: 0; color: var(--shu); }
+  .tips-list li:last-child { border-bottom: none; }
+
+  /* ---- 句帳 ---- */
+  .kucho-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 10px 4px; border-bottom: 1px dotted var(--line);
+  }
+  .kucho-ku { font-size: 1rem; letter-spacing: 0.05em; }
+  .kucho-date { font-size: 0.7rem; color: var(--usuzumi); margin-top: 2px; }
+  .kucho-del {
+    border: none; background: none; color: var(--usuzumi); cursor: pointer;
+    font-size: 1rem; font-family: inherit; padding: 4px 8px;
+  }
+  .kucho-del:hover { color: var(--shu); }
+  .kucho-empty { font-size: 0.85rem; color: var(--usuzumi); text-align: center; padding: 10px 0; }
+
+  /* ---- 縦書きプレビューモーダル ---- */
+  .modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(43,42,40,0.55);
+    z-index: 10; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 14px; padding: 28px 24px;
+    max-width: 90vw; text-align: center; box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+  }
+  .modal h2 { font-size: 1rem; color: var(--shu); letter-spacing: 0.3em; margin-bottom: 18px; }
+  .tategaki {
+    writing-mode: vertical-rl; margin: 0 auto;
+    display: inline-flex; gap: 1.2em;
+    font-size: 1.5rem; letter-spacing: 0.25em; line-height: 1.4;
+    min-height: 280px; padding: 10px 20px;
+    background: linear-gradient(135deg, #fffdf7 0%, #faf5e6 100%);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .tategaki .l2 { padding-top: 1.5em; }
+  .tategaki .l3 { padding-top: 3em; }
+  .modal-btns { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+  .m-btn {
+    border: 1px solid var(--sumi); background: none; border-radius: 999px;
+    padding: 8px 20px; font-family: inherit; font-size: 0.9rem; cursor: pointer; color: var(--sumi);
+  }
+  .m-btn.primary { background: var(--shu); border-color: var(--shu); color: #fff; }
+  .m-btn:hover { opacity: 0.8; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--sumi); color: var(--washi); border-radius: 999px;
+    padding: 10px 24px; font-size: 0.9rem; z-index: 20; transition: transform 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ---- 投票（句くらべ・バトル） ---- */
+  .vote-modal { max-width: 580px; width: 100%; }
+  .vote-sub { font-size: 0.78rem; color: var(--usuzumi); margin: -8px 0 18px; line-height: 1.6; }
+  .vote-cards { display: flex; gap: 10px; align-items: stretch; }
+  .vote-card {
+    flex: 1; background: var(--washi); border: 2px solid var(--line); border-radius: 12px;
+    padding: 16px 10px 12px; font-family: inherit; cursor: pointer; text-align: center;
+    transition: border-color 0.15s, transform 0.12s, box-shadow 0.15s; color: var(--sumi);
+  }
+  .vote-card:hover { border-color: var(--shu); transform: translateY(-3px); box-shadow: 0 6px 18px rgba(199,62,58,0.18); }
+  .vc-ku { display: inline-flex; gap: 0.9em; writing-mode: vertical-rl; font-size: 1.15rem; letter-spacing: 0.18em; min-height: 168px; margin: 0 auto; }
+  .vc-ku .l2 { padding-top: 1em; }
+  .vc-ku .l3 { padding-top: 2em; }
+  .vc-rate { margin-top: 10px; font-size: 0.72rem; color: var(--usuzumi); }
+  .vs-mark { align-self: center; font-size: 0.85rem; color: var(--shu); font-weight: bold; letter-spacing: 0.1em; }
+
+  .vote-result .vr-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px dotted var(--line); }
+  .vr-ku { flex: 1; font-size: 0.95rem; text-align: left; letter-spacing: 0.04em; }
+  .vr-win { font-size: 0.68rem; color: var(--shu); margin-left: 4px; }
+  .vr-delta { font-size: 0.95rem; font-weight: bold; white-space: nowrap; text-align: right; line-height: 1.3; }
+  .vr-delta small { font-size: 0.68rem; color: var(--usuzumi); font-weight: normal; }
+  .vr-delta.up { color: var(--matcha); }
+  .vr-delta.down { color: var(--usuzumi); }
+
+  /* ---- ランキング ---- */
+  .rank-item { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px dotted var(--line); }
+  .rank-no { width: 1.7em; text-align: center; font-weight: bold; color: var(--kin); font-size: 0.9rem; }
+  .rank-no.top { color: var(--shu); font-size: 1.05rem; }
+  .rank-ku { flex: 1; font-size: 0.95rem; letter-spacing: 0.04em; }
+  .rank-mine { font-size: 0.62rem; color: #fff; background: var(--matcha); border-radius: 6px; padding: 1px 6px; margin-left: 6px; }
+  .rank-score { font-size: 0.8rem; color: var(--usuzumi); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>いっくいっく <span class="quick">1Quick</span></h1>
+    <p class="tagline">— 五・七・五を埋めるだけ。きょうの一句、いっきにどうぞ —</p>
+  </header>
+
+  <!-- お題ガチャ -->
+  <div class="odai-box">
+    <span class="odai-label">お題</span>
+    <span class="odai-text" id="odaiText">じゆうに詠んでみよう</span>
+    <button class="gacha-btn" id="gachaBtn">お題ガチャ 🎲</button>
+  </div>
+
+  <!-- 3行入力 -->
+  <div class="ku-area" id="kuArea"></div>
+
+  <div class="finish-bar">
+    <button class="finish-btn" id="finishBtn">一句できた！</button>
+    <p class="finish-note">※字余り・字足らずでも詠めます（ボタンは三行埋まれば押せます）</p>
+  </div>
+
+  <!-- 季語パレット -->
+  <div class="panel open" id="kigoPanel">
+    <button class="panel-head">🌸 季語パレット（タップで挿入）<span class="arrow">▶</span></button>
+    <div class="panel-body">
+      <div class="season-tabs" id="seasonTabs"></div>
+      <div class="kigo-chips" id="kigoChips"></div>
+      <p class="kigo-note">※カーソルがある行に入ります。季語がなくても OK（それは川柳！）</p>
+    </div>
+  </div>
+
+  <!-- 型テンプレート -->
+  <div class="panel" id="tmplPanel">
+    <button class="panel-head">📐 型からはじめる（例句を書き換えるだけ）<span class="arrow">▶</span></button>
+    <div class="panel-body" id="tmplBody"></div>
+  </div>
+
+  <!-- コツ -->
+  <div class="panel" id="tipsPanel">
+    <button class="panel-head">💡 はじめてのコツ<span class="arrow">▶</span></button>
+    <div class="panel-body">
+      <ul class="tips-list">
+        <li>むずかしく考えない。<b>見たまま・感じたまま</b>を言葉にすれば、もう俳句。</li>
+        <li>音数は「文字数」ではなく「音（おん）」。小さい「ゃゅょ」は数えず（しゃ＝1音）、「っ」「ー」「ん」は1音と数えます。</li>
+        <li>切れ字「<b>や・かな・けり</b>」を置くと、ぐっと俳句らしくなります（例：春風<b>や</b>〜）。</li>
+        <li>説明しない。「うれしい」と書くより、うれしくて<b>何をしたか</b>を描くと伝わります。</li>
+        <li>字余り・字足らずも立派な表現。まず完成させるのがいちばん大事！</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 句帳 -->
+  <div class="panel" id="kuchoPanel">
+    <button class="panel-head">📖 わたしの句帳<span class="arrow">▶</span></button>
+    <div class="panel-body" id="kuchoBody"></div>
+  </div>
+
+  <!-- ランキング -->
+  <div class="panel" id="rankPanel">
+    <button class="panel-head">🏆 みんなの句ランキング<span class="arrow">▶</span></button>
+    <div class="panel-body" id="rankBody"></div>
+  </div>
+</div>
+
+<!-- 縦書きプレビュー -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>一 句 完 成</h2>
+    <div class="tategaki" id="tategaki"></div>
+    <div class="modal-btns">
+      <button class="m-btn primary" id="saveBtn">投稿する</button>
+      <button class="m-btn" id="copyBtn">コピー</button>
+      <button class="m-btn" id="closeBtn">もどる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 句くらべ（投票） -->
+<div class="modal-bg" id="voteBg">
+  <div class="modal vote-modal">
+    <div id="votePick">
+      <h2>どちらが すき？</h2>
+      <p class="vote-sub">あなたの句に雰囲気が近い2句が選ばれました。好きな方をえらぶと、その句のレイティングが上がります。</p>
+      <div class="vote-cards">
+        <button class="vote-card" id="voteA"></button>
+        <span class="vs-mark">VS</span>
+        <button class="vote-card" id="voteB"></button>
+      </div>
+      <div class="modal-btns">
+        <button class="m-btn" id="voteSkip">スキップしてとじる</button>
+      </div>
+    </div>
+    <div id="voteResult" class="vote-result" style="display:none;">
+      <h2>レイティング こうしん</h2>
+      <div id="voteResultBody"></div>
+      <div class="modal-btns">
+        <button class="m-btn primary" id="voteSeeRank">ランキングを見る</button>
+        <button class="m-btn" id="voteDone">とじる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ▼▼ みんなで共有する設定 ▼▼
+     Supabase の値をここに入れると「全員で共有」モードになります。
+     空のままなら、この端末だけで動く（今まで通りの）ローカルモードです。
+     セットアップ手順は同じフォルダの supabase.sql / README を参照。 -->
+<script>
+  window.SUPA_URL = '';   // 例: 'https://xxxxxxxx.supabase.co'
+  window.SUPA_KEY = '';   // 例: 'eyJhbGciOi...'（anon public key。公開してOKな鍵です）
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- ▲▲ ここまで ▲▲ -->
+
+<script>
+// ===== 音数カウント =====
+// 小書き文字（拗音など）は数えない。「っ」「ー」「ん」は1音。
+const SMALL = 'ぁぃぅぇぉゃゅょゎゕゖァィゥェォャュョヮヵヶ';
+const SKIP = /[\s、。，．・！？!?「」『』（）()〜…―\-]/;
+
+function countMora(str) {
+  let count = 0, unknown = false;
+  for (const ch of str) {
+    if (SKIP.test(ch)) continue;
+    const isKana = (ch >= 'ぁ' && ch <= 'ゖ') || (ch >= 'ァ' && ch <= 'ヺ') || ch === 'ー';
+    if (isKana) {
+      if (!SMALL.includes(ch)) count++;
+    } else {
+      unknown = true; // 漢字・英数など：よみで数える必要あり
+    }
+  }
+  return { count, unknown };
+}
+
+// ===== 3行入力の生成 =====
+const LINES = [
+  { name: '上五（かみご）', target: 5, ph: 'はるかぜや' },
+  { name: '中七（なかしち）', target: 7, ph: 'なにかがそらを' },
+  { name: '下五（しもご）', target: 5, ph: 'とんでいく' },
+];
+const kuArea = document.getElementById('kuArea');
+let focusedLine = 0;
+
+LINES.forEach((l, i) => {
+  const row = document.createElement('div');
+  row.className = 'ku-row';
+  row.innerHTML = `
+    <div class="ku-head">
+      <span class="ku-name">${l.name}・${l.target}音</span>
+      <span class="mora-badge off" id="badge${i}">0 / ${l.target}</span>
+    </div>
+    <input class="ku-input" id="line${i}" placeholder="${l.ph}" autocomplete="off">
+    <div class="yomi-row" id="yomiRow${i}">
+      <label>よみ（ひらがなで）</label>
+      <input class="yomi-input" id="yomi${i}" placeholder="漢字のよみを入れると音数を数えられます">
+    </div>
+    <div class="mora-dots" id="dots${i}">${'<span></span>'.repeat(l.target)}</div>
+  `;
+  kuArea.appendChild(row);
+});
+
+function lineCount(i) {
+  const main = document.getElementById('line' + i).value;
+  const yomi = document.getElementById('yomi' + i).value;
+  const m = countMora(main);
+  if (m.unknown && yomi.trim()) {
+    return { count: countMora(yomi).count, unknown: false, hasText: main.trim() !== '' };
+  }
+  return { count: m.count, unknown: m.unknown, hasText: main.trim() !== '' };
+}
+
+function update() {
+  let allFilled = true;
+  LINES.forEach((l, i) => {
+    const { count, unknown, hasText } = lineCount(i);
+    if (!hasText) allFilled = false;
+    const badge = document.getElementById('badge' + i);
+    const row = document.getElementById('line' + i).closest('.ku-row');
+    const yomiRow = document.getElementById('yomiRow' + i);
+    yomiRow.classList.toggle('show', unknown || document.getElementById('yomi' + i).value !== '');
+
+    if (unknown) {
+      badge.textContent = `？ / ${l.target}（よみを入力）`;
+      badge.className = 'mora-badge off';
+    } else if (count === l.target) {
+      badge.textContent = `${count} / ${l.target} ◎`;
+      badge.className = 'mora-badge ok';
+    } else if (hasText && Math.abs(count - l.target) === 1) {
+      badge.textContent = `${count} / ${l.target} ${count > l.target ? '字余り' : '字足らず'}（OK!）`;
+      badge.className = 'mora-badge near';
+    } else {
+      badge.textContent = `${count} / ${l.target}`;
+      badge.className = 'mora-badge off';
+    }
+    row.classList.toggle('done', count === l.target && hasText);
+
+    const dots = document.getElementById('dots' + i).children;
+    for (let d = 0; d < dots.length; d++) {
+      dots[d].className = d < Math.min(count, l.target) ? 'fill' : '';
+    }
+    if (count > l.target) for (const dot of dots) dot.className = 'over';
+  });
+  document.getElementById('finishBtn').classList.toggle('ready', allFilled);
+}
+
+for (let i = 0; i < 3; i++) {
+  const inp = document.getElementById('line' + i);
+  inp.addEventListener('input', update);
+  inp.addEventListener('focus', () => focusedLine = i);
+  document.getElementById('yomi' + i).addEventListener('input', update);
+}
+update();
+
+// ===== お題ガチャ =====
+const ODAI = [
+  '朝のコンビニ', '帰り道', 'うちの猫（犬）', '雨上がりの空', 'スマホの画面',
+  '今日たべたもの', '電車の窓から', '休日の昼寝', 'ともだちの顔', '新しい靴',
+  '月をみつけた', 'ため息ひとつ', 'ポケットの中', '自動販売機', '夜のしずけさ',
+  '鏡の中のじぶん', 'すきな音楽', '遠くのサイレン', '冷蔵庫をあける', '信号待ち',
+];
+document.getElementById('gachaBtn').addEventListener('click', () => {
+  const t = ODAI[Math.floor(Math.random() * ODAI.length)];
+  document.getElementById('odaiText').textContent = t;
+});
+
+// ===== 季語パレット =====
+const KIGO = {
+  '春': [['桜', 'さくら'], ['菜の花', 'なのはな'], ['春風', 'はるかぜ'], ['つばめ', 'つばめ'], ['蛙', 'かわず'], ['花見', 'はなみ'], ['霞', 'かすみ'], ['若草', 'わかくさ'], ['朧月', 'おぼろづき'], ['入学', 'にゅうがく']],
+  '夏': [['風鈴', 'ふうりん'], ['入道雲', 'にゅうどうぐも'], ['蝉', 'せみ'], ['花火', 'はなび'], ['かき氷', 'かきごおり'], ['夕立', 'ゆうだち'], ['向日葵', 'ひまわり'], ['金魚', 'きんぎょ'], ['蛍', 'ほたる'], ['麦茶', 'むぎちゃ']],
+  '秋': [['月見', 'つきみ'], ['紅葉', 'もみじ'], ['とんぼ', 'とんぼ'], ['秋風', 'あきかぜ'], ['稲穂', 'いなほ'], ['虫の声', 'むしのこえ'], ['柿', 'かき'], ['案山子', 'かかし'], ['夜長', 'よなが'], ['銀杏', 'いちょう']],
+  '冬': [['雪', 'ゆき'], ['こたつ', 'こたつ'], ['北風', 'きたかぜ'], ['みかん', 'みかん'], ['木枯らし', 'こがらし'], ['湯豆腐', 'ゆどうふ'], ['焚火', 'たきび'], ['マフラー', 'まふらー'], ['初霜', 'はつしも'], ['息白し', 'いきしろし']],
+  '新年': [['初日の出', 'はつひので'], ['初夢', 'はつゆめ'], ['門松', 'かどまつ'], ['お年玉', 'おとしだま'], ['初詣', 'はつもうで'], ['雑煮', 'ぞうに']],
+};
+const seasonTabs = document.getElementById('seasonTabs');
+const kigoChips = document.getElementById('kigoChips');
+let currentSeason = '春';
+
+function renderKigo() {
+  kigoChips.innerHTML = '';
+  KIGO[currentSeason].forEach(([word, yomi]) => {
+    const b = document.createElement('button');
+    const mora = countMora(yomi).count;
+    b.className = 'chip';
+    b.innerHTML = `${word}<small>${mora}音</small>`;
+    b.addEventListener('click', () => {
+      const inp = document.getElementById('line' + focusedLine);
+      inp.value += word;
+      // 漢字を含む季語なら、よみ欄にも自動でよみを足す
+      if (countMora(word).unknown) {
+        const yomiInp = document.getElementById('yomi' + focusedLine);
+        yomiInp.value += yomi;
+      }
+      update();
+      inp.focus();
+    });
+    kigoChips.appendChild(b);
+  });
+}
+Object.keys(KIGO).forEach(s => {
+  const t = document.createElement('button');
+  t.className = 'season-tab' + (s === currentSeason ? ' active' : '');
+  t.textContent = s;
+  t.addEventListener('click', () => {
+    currentSeason = s;
+    document.querySelectorAll('.season-tab').forEach(x => x.classList.toggle('active', x.textContent === s));
+    renderKigo();
+  });
+  seasonTabs.appendChild(t);
+});
+renderKigo();
+
+// ===== 型テンプレート =====
+const TEMPLATES = [
+  {
+    title: '切れ字「や」型 — いちばん俳句らしい',
+    lines: ['ゆうやけや', 'こどもらはしる', 'かえりみち'],
+    hint: '上五を「季語＋や」にして、あとは見た景色をそのまま',
+  },
+  {
+    title: '「〜かな」でしめる型 — しみじみ系',
+    lines: ['きたかぜや', 'ポケットのなか', 'ぬくきかな'],
+    hint: '下五を「〜かな」で結ぶと余韻がでます',
+  },
+  {
+    title: 'ぜんぶ自分で型 — まっさらから',
+    lines: ['', '', ''],
+    hint: '入力欄をクリアします',
+  },
+];
+const tmplBody = document.getElementById('tmplBody');
+TEMPLATES.forEach(t => {
+  const card = document.createElement('button');
+  card.className = 'tmpl-card';
+  card.innerHTML = `
+    <div class="tmpl-title">${t.title}</div>
+    <div class="tmpl-ex">${t.lines.join('　') || '（白紙にもどす）'}</div>
+    <div class="tmpl-hint">${t.hint}</div>
+  `;
+  card.addEventListener('click', () => {
+    t.lines.forEach((v, i) => {
+      document.getElementById('line' + i).value = v;
+      document.getElementById('yomi' + i).value = '';
+    });
+    update();
+    document.getElementById('line0').focus();
+  });
+  tmplBody.appendChild(card);
+});
+
+// ===== パネル開閉 =====
+document.querySelectorAll('.panel-head').forEach(h => {
+  h.addEventListener('click', () => h.closest('.panel').classList.toggle('open'));
+});
+
+// ===== 完成 → 縦書きプレビュー =====
+const modalBg = document.getElementById('modalBg');
+document.getElementById('finishBtn').addEventListener('click', () => {
+  if (!document.getElementById('finishBtn').classList.contains('ready')) return;
+  const lines = [0, 1, 2].map(i => document.getElementById('line' + i).value.trim());
+  document.getElementById('tategaki').innerHTML =
+    `<div class="l1">${esc(lines[0])}</div><div class="l2">${esc(lines[1])}</div><div class="l3">${esc(lines[2])}</div>`;
+  modalBg.classList.add('show');
+});
+document.getElementById('closeBtn').addEventListener('click', () => modalBg.classList.remove('show'));
+modalBg.addEventListener('click', e => { if (e.target === modalBg) modalBg.classList.remove('show'); });
+
+function esc(s) {
+  return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function currentKuText() {
+  return [0, 1, 2].map(i => document.getElementById('line' + i).value.trim()).join('　');
+}
+
+// ===== 句帳（localStorage） =====
+const STORE_KEY = 'ikku_quick_kucho';
+function loadKucho() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; }
+}
+function renderKucho() {
+  const body = document.getElementById('kuchoBody');
+  const list = loadKucho();
+  if (list.length === 0) {
+    body.innerHTML = '<p class="kucho-empty">まだ句がありません。最初の一句を詠んでみよう！</p>';
+    return;
+  }
+  body.innerHTML = '';
+  list.slice().reverse().forEach((item, ri) => {
+    const idx = list.length - 1 - ri;
+    const div = document.createElement('div');
+    div.className = 'kucho-item';
+    div.innerHTML = `
+      <div><div class="kucho-ku">${esc(item.ku)}</div><div class="kucho-date">${item.date}</div></div>
+      <button class="kucho-del" title="削除">✕</button>
+    `;
+    div.querySelector('.kucho-del').addEventListener('click', () => {
+      const l = loadKucho();
+      l.splice(idx, 1);
+      localStorage.setItem(STORE_KEY, JSON.stringify(l));
+      renderKucho();
+    });
+    body.appendChild(div);
+  });
+}
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  // 自分の句帳に残す
+  const list = loadKucho();
+  const d = new Date();
+  list.push({ ku: currentKuText(), date: `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` });
+  localStorage.setItem(STORE_KEY, JSON.stringify(list));
+  renderKucho();
+  // みんなの句プールに投稿し、似た句くらべへ
+  const lines = [0, 1, 2].map(i => document.getElementById('line' + i).value.trim());
+  const yomis = [0, 1, 2].map(i => document.getElementById('yomi' + i).value.trim());
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  const mine = await postToPool(lines, yomis);
+  saveBtn.disabled = false;
+  modalBg.classList.remove('show');
+  await renderRanking();
+  if (mine) startVote(mine);
+});
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(currentKuText() + '　#いっくいっく');
+    showToast('コピーしました');
+  } catch {
+    showToast('コピーできませんでした');
+  }
+});
+renderKucho();
+
+// ===== みんなの句プール：似た句さがし & レイティング =====
+const POOL_KEY = 'ikku_quick_pool';
+const SEASONS = ['春', '夏', '秋', '冬', '新年'];
+
+// テーマ（雰囲気）の手がかり語。句のテキスト＋よみから一致を数える。
+const THEMES = [
+  ['空・天気', ['そら', '空', 'くも', '雲', 'あめ', '雨', 'かぜ', '風', 'つき', '月', 'ほし', '星', 'ゆき', '雪', 'にじ', '虹', 'あおぞら', 'ゆうやけ', 'ゆうひ', '夕焼', '夕日', 'たいよう', '太陽', 'あさひ', '朝日']],
+  ['植物', ['はなびら', 'はな', '花', 'さくら', '桜', 'もみじ', '紅葉', 'くさ', '草', 'なのはな', 'ひまわり', '向日葵', 'いちょう', '銀杏', 'わかば', '若葉', 'つぼみ', 'は ']],
+  ['生きもの', ['ねこ', '猫', 'いぬ', '犬', 'とり', '鳥', 'むし', '虫', 'せみ', '蝉', 'とんぼ', 'かわず', '蛙', 'かえる', 'きんぎょ', '金魚', 'ほたる', '蛍', 'つばめ', 'すずめ', '雀']],
+  ['人・くらし', ['みち', '道', 'あさ', '朝', 'よる', '夜', 'ばん', '晩', 'いえ', '家', 'こども', '子', 'かえり', '帰', 'まち', '町', 'がっこう', '学校', 'でんしゃ', '電車', 'コンビニ', 'ポケット', 'まど', '窓']],
+  ['きもち', ['うれし', '嬉', 'たのし', '楽し', 'さびし', '寂', 'さみし', 'なつかし', '懐かし', 'かなし', '悲', 'せつな', '切な', 'しずか', '静か', 'ふあん', 'どきどき', 'ためいき', 'ため息', 'ひとり', '一人', 'ふたり']],
+  ['うごき', ['とぶ', 'とび', '飛', 'はしる', '走', 'かける', 'かけ', 'ゆれ', '揺れ', 'ながれ', '流れ', 'おちる', '落ち', 'つもる', '積も', 'まう', '舞', 'まわる', '回', 'のびる']],
+  ['色・光', ['あか', '赤', 'あお', '青', 'しろ', '白', 'みどり', '緑', 'きいろ', '黄', 'ひかり', '光', 'かげ', '影', 'あかり', '灯', 'きらめ', 'まぶし']],
+  ['音', ['おと', '音', 'こえ', '声', 'なる', '鳴', 'しずけさ', '静けさ', 'ひびく', '響', 'ささやき', 'しぐれ']],
+];
+
+// 季節：既存の季語リスト KIGO（語・よみ）から検出
+function detectSeason(text) {
+  const v = [0, 0, 0, 0, 0];
+  SEASONS.forEach((s, i) => {
+    for (const [w, y] of KIGO[s]) {
+      if (text.includes(w) || (y && text.includes(y))) { v[i] = 1; break; }
+    }
+  });
+  return v;
+}
+function themeVec(text) {
+  return THEMES.map(([, words]) => {
+    let c = 0;
+    for (const w of words) if (w.trim() && text.includes(w)) c++;
+    return c;
+  });
+}
+function buildVector(lines, yomis) {
+  const text = lines.join('') + '|' + yomis.join('');
+  const s = detectSeason(text).map(x => x * 2); // 季節は雰囲気の柱なので重め
+  return s.concat(themeVec(text));
+}
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  if (na === 0 || nb === 0) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+// 比べる相手がいるよう、季節バラバラのサンプルを用意
+const SEED = [
+  'さくらさく / かぜにのりゆく / はなびらや',
+  'はるかぜや / こどもらかける / かよいみち',
+  'ふうりんの / おとにふりむく / ゆうまぐれ',
+  'にゅうどうぐも / みあげてのびる / せのびかな',
+  'せみしぐれ / きのねにすわる / ひるさがり',
+  'あかとんぼ / ゆうひにとけて / きえにけり',
+  'つきしろし / むしのこえだけ / のこるよる',
+  'もみじちる / みずにうかんで / ながれゆく',
+  'こたつから / でられぬねこと / ぼくふたり',
+  'きたかぜや / マフラーまいて / かけるみち',
+  'ゆきのよる / しずかにつもる / おとのなさ',
+  'はつひので / やまのはあかく / もえはじむ',
+];
+function seedPool() {
+  return SEED.map((s, i) => {
+    const lines = s.split('/').map(x => x.trim());
+    const item = { id: 'seed' + i, lines, yomis: lines, rating: 1500, battles: 0, mine: false, date: '' };
+    item.vec = buildVector(item.lines, item.yomis);
+    return item;
+  });
+}
+// ---- ローカル保存（オフライン時のプール ＆ 自分の投稿idの記録） ----
+function loadPoolLocal() {
+  try {
+    const raw = localStorage.getItem(POOL_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  const p = seedPool();
+  localStorage.setItem(POOL_KEY, JSON.stringify(p));
+  return p;
+}
+function savePoolLocal(p) { localStorage.setItem(POOL_KEY, JSON.stringify(p)); }
+
+const MINE_KEY = 'ikku_quick_mine'; // オンライン時、自分が投稿したidを覚えておく（バッジ用）
+function loadMine() { try { return new Set(JSON.parse(localStorage.getItem(MINE_KEY)) || []); } catch { return new Set(); } }
+function addMine(id) { const s = loadMine(); s.add(id); localStorage.setItem(MINE_KEY, JSON.stringify([...s])); }
+
+// ---- オンライン共有（Supabase）か、ローカルかを自動判定 ----
+const ONLINE = !!(window.SUPA_URL && window.SUPA_KEY && window.supabase);
+const sb = ONLINE ? window.supabase.createClient(window.SUPA_URL, window.SUPA_KEY) : null;
+
+// プール全件を取得（vec が無ければその場で計算）
+async function fetchPool() {
+  if (ONLINE) {
+    const { data, error } = await sb.from('haiku').select('id,lines,yomis,vec,rating,battles');
+    if (error) { console.error(error); showToast('読み込みに失敗しました'); return []; }
+    const mine = loadMine();
+    return data.map(r => ({
+      id: r.id, lines: r.lines, yomis: r.yomis || r.lines,
+      vec: (r.vec && r.vec.length) ? r.vec : buildVector(r.lines, r.yomis || r.lines),
+      rating: r.rating, battles: r.battles, mine: mine.has(r.id),
+    }));
+  }
+  return loadPoolLocal();
+}
+
+// 投稿：プールに1句追加して、その句を返す
+async function postToPool(lines, yomis) {
+  const vec = buildVector(lines, yomis);
+  if (ONLINE) {
+    const { data, error } = await sb.from('haiku').insert({ lines, yomis, vec }).select().single();
+    if (error) { console.error(error); showToast('投稿に失敗しました'); return null; }
+    addMine(data.id);
+    return { id: data.id, lines, yomis, vec, rating: data.rating, battles: data.battles, mine: true };
+  }
+  const pool = loadPoolLocal();
+  const item = {
+    id: 'p' + Date.now() + Math.floor(Math.random() * 1000),
+    lines, yomis, vec, rating: 1500, battles: 0, mine: true,
+    date: new Date().toLocaleDateString('ja-JP'),
+  };
+  pool.push(item);
+  savePoolLocal(pool);
+  return item;
+}
+
+// 投票結果をレーティングに反映（オンラインはサーバー側の関数で原子的に計算）
+async function applyVote(winner, loser) {
+  if (ONLINE) {
+    const { data, error } = await sb.rpc('vote', { winner: winner.id, loser: loser.id });
+    if (error) { console.error(error); showToast('反映に失敗しました'); return null; }
+    const row = Array.isArray(data) ? data[0] : data;
+    const wDelta = row.winner_rating - winner.rating;
+    const lDelta = row.loser_rating - loser.rating;
+    winner.rating = row.winner_rating; loser.rating = row.loser_rating;
+    return { wDelta, lDelta };
+  }
+  const d = elo(winner, loser);
+  const pool = loadPoolLocal();
+  for (const it of pool) {
+    if (it.id === winner.id) { it.rating = winner.rating; it.battles = winner.battles; }
+    if (it.id === loser.id) { it.rating = loser.rating; it.battles = loser.battles; }
+  }
+  savePoolLocal(pool);
+  return d;
+}
+
+// 自分の句に近い句を上位からしぼり、その中から2つ提示
+function pickRivals(pool, item) {
+  const others = pool.filter(x => x.id !== item.id);
+  if (others.length < 2) return null;
+  const scored = others.map(x => ({ x, sim: cosine(item.vec, x.vec) }));
+  scored.sort((a, b) => (b.sim - a.sim) || (b.x.rating - a.x.rating));
+  const top = scored.slice(0, Math.min(6, scored.length));
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+  return [top[0].x, top[1].x];
+}
+
+// Elo レーティング
+function elo(winner, loser) {
+  const K = 32;
+  const ea = 1 / (1 + Math.pow(10, (loser.rating - winner.rating) / 400));
+  const wBefore = winner.rating, lBefore = loser.rating;
+  winner.rating += K * (1 - ea);
+  loser.rating += K * (0 - (1 - ea));
+  winner.battles++; loser.battles++;
+  return { wDelta: winner.rating - wBefore, lDelta: loser.rating - lBefore };
+}
+
+// ===== 句くらべ（投票）UI =====
+const voteBg = document.getElementById('voteBg');
+let voteRivals = null;
+
+function kuVertical(lines) {
+  return `<span class="vc-ku"><span class="l1">${esc(lines[0])}</span><span class="l2">${esc(lines[1])}</span><span class="l3">${esc(lines[2])}</span></span>`;
+}
+async function startVote(mine) {
+  const pool = await fetchPool();
+  const rivals = pickRivals(pool, mine);
+  if (!rivals) {
+    showToast('投稿しました！句が増えると句くらべができます 📖');
+    return;
+  }
+  voteRivals = rivals;
+  document.getElementById('votePick').style.display = '';
+  document.getElementById('voteResult').style.display = 'none';
+  document.getElementById('voteA').innerHTML = kuVertical(rivals[0].lines) + `<div class="vc-rate">レート ${Math.round(rivals[0].rating)}</div>`;
+  document.getElementById('voteB').innerHTML = kuVertical(rivals[1].lines) + `<div class="vc-rate">レート ${Math.round(rivals[1].rating)}</div>`;
+  voteBg.classList.add('show');
+}
+async function pick(winnerIdx) {
+  const winner = voteRivals[winnerIdx];
+  const loser = voteRivals[1 - winnerIdx];
+  const res = await applyVote(winner, loser);
+  if (!res) return;
+  await renderRanking();
+  showVoteResult(winner, loser, res.wDelta, res.lDelta);
+}
+function showVoteResult(winner, loser, wDelta, lDelta) {
+  document.getElementById('votePick').style.display = 'none';
+  document.getElementById('voteResult').style.display = '';
+  document.getElementById('voteResultBody').innerHTML = `
+    <div class="vr-row">
+      <span class="vr-ku">${esc(winner.lines.join('　'))}<span class="vr-win">えらばれた句</span></span>
+      <span class="vr-delta up">▲ +${Math.round(wDelta)}<br><small>${Math.round(winner.rating)}</small></span>
+    </div>
+    <div class="vr-row">
+      <span class="vr-ku">${esc(loser.lines.join('　'))}</span>
+      <span class="vr-delta down">▼ ${Math.round(lDelta)}<br><small>${Math.round(loser.rating)}</small></span>
+    </div>`;
+}
+document.getElementById('voteA').addEventListener('click', () => pick(0));
+document.getElementById('voteB').addEventListener('click', () => pick(1));
+document.getElementById('voteSkip').addEventListener('click', () => voteBg.classList.remove('show'));
+document.getElementById('voteDone').addEventListener('click', () => voteBg.classList.remove('show'));
+document.getElementById('voteSeeRank').addEventListener('click', () => {
+  voteBg.classList.remove('show');
+  const rp = document.getElementById('rankPanel');
+  rp.classList.add('open');
+  rp.scrollIntoView({ behavior: 'smooth' });
+});
+voteBg.addEventListener('click', e => { if (e.target === voteBg) voteBg.classList.remove('show'); });
+
+// ===== ランキング =====
+async function renderRanking() {
+  const body = document.getElementById('rankBody');
+  const pool = (await fetchPool()).slice().sort((a, b) => b.rating - a.rating);
+  body.innerHTML = ONLINE ? '' : '<p class="kigo-note" style="margin:0 0 8px;">※いまは「この端末だけ」のローカルモードです。みんなと共有するには設定が必要です。</p>';
+  pool.slice(0, 30).forEach((it, i) => {
+    const div = document.createElement('div');
+    div.className = 'rank-item';
+    div.innerHTML = `
+      <span class="rank-no${i < 3 ? ' top' : ''}">${i + 1}</span>
+      <span class="rank-ku">${esc(it.lines.join('　'))}${it.mine ? '<span class="rank-mine">あなた</span>' : ''}</span>
+      <span class="rank-score">${Math.round(it.rating)}</span>`;
+    body.appendChild(div);
+  });
+}
+renderRanking();
+
+// ===== トースト =====
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+</script>
+</body>
+</html>
